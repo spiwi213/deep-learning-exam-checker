@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Answer Key Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0b0c0f; --card: #14151a; --border: #22242c;
+      --green: #00e676; --green-dim: #00b85622; --blue: #2979ff;
+      --orange: #ff6d00; --red: #f44336; --text: #eeeef3; --muted: #70717e; --r: 14px;
+    }
+    body { background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100dvh; }
+
+    /* ── HEADER ── */
+    .header { display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; background: var(--card); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 36px; height: 36px; background: var(--orange); border-radius: 10px;
+      display: grid; place-items: center; font-size: 18px; }
+    .logo h1 { font-size: 1rem; font-weight: 700; }
+    .logo p { font-size: 0.72rem; color: var(--muted); }
+    .back-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--text); font-size: 0.8rem;
+      cursor: pointer; text-decoration: none; }
+
+    .container { padding: 20px 18px; max-width: 600px; margin: 0 auto;
+      display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── EXAM SELECTOR ── */
+    .card { background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px; }
+    .card-title { font-size: 0.72rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 12px; }
+    select, input[type=text] {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; color: var(--text); padding: 10px 12px;
+      font-size: 0.9rem; outline: none; }
+    select:focus, input:focus { border-color: var(--blue); }
+
+    /* ── OPTION TABS ── */
+    .tabs { display: flex; gap: 0; border-radius: var(--r); overflow: hidden;
+      border: 1px solid var(--border); }
+    .tab { flex: 1; padding: 13px 10px; border: none; background: var(--bg);
+      color: var(--muted); font-size: 0.85rem; font-weight: 600; cursor: pointer;
+      transition: all 0.2s; text-align: center; }
+    .tab.active { background: var(--blue); color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── PDF UPLOAD AREA ── */
+    .upload-area { border: 2px dashed var(--border); border-radius: var(--r);
+      padding: 32px 20px; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s; position: relative; }
+    .upload-area:hover, .upload-area.dragover { border-color: var(--blue);
+      background: rgba(41,121,255,0.05); }
+    .upload-area .icon { font-size: 36px; margin-bottom: 10px; opacity: 0.6; }
+    .upload-area p { font-size: 0.85rem; color: var(--muted); }
+    .upload-area strong { color: var(--blue); }
+    .upload-area input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .file-selected { background: rgba(41,121,255,0.08); border-color: var(--blue); }
+    .file-name { font-size: 0.82rem; color: var(--blue); margin-top: 8px; font-weight: 600; }
+
+    /* ── CAMERA SECTION ── */
+    .camera-wrap { position: relative; background: #000; border-radius: var(--r);
+      overflow: hidden; width: 100%; }
+    #processed { width: 100%; display: block; min-height: 200px; object-fit: cover; }
+    #video { display: none; }
+    .cam-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 10px; background: #0b0c0f; }
+    .cam-placeholder .icon { font-size: 40px; opacity: 0.3; }
+    .cam-placeholder p { font-size: 0.8rem; color: var(--muted); }
+    .cam-placeholder.hidden { display: none; }
+    .flash { position: absolute; inset: 0; background: rgba(0,230,80,0.2);
+      opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+    .flash.show { opacity: 1; }
+
+    /* ── BUTTONS ── */
+    .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+    .btn { flex: 1; padding: 12px 10px; border: none; border-radius: var(--r);
+      font-size: 0.88rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s; }
+    .btn:active { transform: scale(0.97); opacity: 0.8; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-green  { background: var(--green); color: #000; }
+    .btn-blue   { background: var(--blue);  color: #fff; }
+    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-gray   { background: var(--border); color: var(--text); }
+
+    /* ── PREVIEW TABLE ── */
+    .preview-section { display: none; }
+    .preview-header { display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .preview-header h3 { font-size: 0.9rem; font-weight: 700; }
+    .item-count { background: var(--green-dim); color: var(--green);
+      border: 1px solid var(--green); padding: 3px 12px; border-radius: 20px;
+      font-size: 0.75rem; font-weight: 700; }
+    .key-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+      max-height: 300px; overflow-y: auto; margin-bottom: 16px; }
+    .key-item { background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; padding: 10px 8px; text-align: center; }
+    .key-item .q-num { font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; }
+    .key-item .q-ans { font-size: 1rem; font-weight: 700; color: var(--green); }
+    .key-item input { background: transparent; border: none; color: var(--green);
+      font-size: 1rem; font-weight: 700; text-align: center; width: 100%;
+      outline: none; padding: 0; }
+    .key-item input:focus { color: var(--blue); }
+    .edit-hint { font-size: 0.72rem; color: var(--muted); margin-bottom: 12px; text-align: center; }
+
+    /* ── STATUS BAR ── */
+    .status-bar { display: flex; align-items: center; gap: 7px;
+      padding: 10px 0; font-size: 0.8rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    /* ── SPINNER ── */
+    .spinner { display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOAST ── */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 20px; font-size: 0.85rem; font-weight: 600;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.3s;
+      pointer-events: none; z-index: 100; white-space: nowrap; }
+    #toast.show { opacity: 1; }
+    #toast.success { border-color: var(--green); color: var(--green); }
+    #toast.error   { border-color: var(--red);   color: var(--red); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">🔑</div>
+    <div><h1>Answer Key Setup</h1><p>Upload PDF or scan teacher sheet</p></div>
+  </div>
+  <a href="/" class="back-btn">← Dashboard</a>
+</div>
+
+<div class="container">
+
+  <!-- STEP 1: SELECT EXAM -->
+  <div class="card">
+    <div class="card-title">Step 1 — Select Exam</div>
+    <select id="exam-select" onchange="onExamChange()">
+      <option value="">— Select exam to set answer key for —</option>
+      {% for exam in exams %}
+      <option value="{{ exam.id }}"
+        {% if selected and selected.id == exam.id %}selected{% endif %}>
+        {{ exam.name }}
+        {% if exam.has_key %}✓ (has key){% else %}(no key yet){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- STEP 2: CHOOSE METHOD -->
+  <div class="card" id="method-card" style="display:none;">
+    <div class="card-title">Step 2 — How do you want to upload the answer key?</div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('pdf')">📄 Upload PDF</button>
+      <button class="tab"        onclick="switchTab('scan')">📷 Scan Teacher Sheet</button>
+    </div>
+
+    <!-- OPTION A: PDF UPLOAD -->
+    <div class="tab-panel active" id="tab-pdf" style="margin-top:16px;">
+      <div class="upload-area" id="upload-area">
+        <div class="icon">📄</div>
+        <p>Tap to select PDF answer key<br/><strong>or drag and drop here</strong></p>
+        <p class="file-name" id="file-name" style="display:none;"></p>
+        <input type="file" id="pdf-input" accept=".pdf" onchange="onFileSelected()" />
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-blue" id="btn-read-pdf" onclick="readPDF()" disabled>
+          🧠 Read Answer Key from PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- OPTION B: SCAN SHEET -->
+    <div class="tab-panel" id="tab-scan" style="margin-top:16px;">
+      <p style="font-size:0.82rem; color:var(--muted); margin-bottom:12px;">
+        Point your camera at the teacher's answer sheet (the one with correct answers already filled in).
+        The AI will read the answers automatically.
+      </p>
+
+      <div class="status-bar">
+        <div class="dot" id="cam-dot"></div>
+        <span id="cam-status">Camera off</span>
+        <span id="fps" style="margin-left:auto; font-size:0.7rem; color:var(--muted); background:var(--border); padding:2px 8px; border-radius:8px;">0 FPS</span>
+      </div>
+
+      <div class="camera-wrap">
+        <video id="video" autoplay playsinline muted></video>
+        <img id="processed" src="" alt=""/>
+        <div class="flash" id="flash"></div>
+        <div class="cam-placeholder" id="cam-placeholder">
+          <div class="icon">📷</div>
+          <p>Tap START CAMERA to begin</p>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-green"  id="btn-start-cam" onclick="startCam()">▶ START CAMERA</button>
+        <button class="btn btn-orange" id="btn-stop-cam"  onclick="stopCam()" style="display:none;">■ STOP</button>
+        <button class="btn btn-blue"   id="btn-read-scan" onclick="readScan()" disabled>
+          🧠 Read This Sheet
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: PREVIEW + CONFIRM -->
+  <div class="card preview-section" id="preview-section">
+    <div class="preview-header">
+      <h3>Step 3 — Review Answer Key</h3>
+      <span class="item-count" id="item-count">0 items</span>
+    </div>
+    <p class="edit-hint">✏️ Tap any answer to correct it before saving</p>
+    <div class="key-grid" id="key-grid"></div>
+    <div class="btn-row">
+      <button class="btn btn-gray"  onclick="resetPreview()">↺ Try Again</button>
+      <button class="btn btn-green" onclick="confirmKey()">✓ Save Answer Key</button>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div id="toast"></div>
+
+<script>
+  // ── STATE ──
+  let currentKey   = {};
+  let intervalId   = null;
+  let lastWarped   = null;
+  let isRunning    = false;
+  let fpsCount     = 0;
+  let fpsStart     = Date.now();
+  const canvas     = document.createElement('canvas');
+  const ctx        = canvas.getContext('2d');
+
+  // ── DOM ──
+  const video      = document.getElementById('video');
+  const processed  = document.getElementById('processed');
+  const flash      = document.getElementById('flash');
+  const camHolder  = document.getElementById('cam-placeholder');
+  const camDot     = document.getElementById('cam-dot');
+  const camStatus  = document.getElementById('cam-status');
+  const fpsBadge   = document.getElementById('fps');
+  const btnStart   = document.getElementById('btn-start-cam');
+  const btnStop    = document.getElementById('btn-stop-cam');
+  const btnScan    = document.getElementById('btn-read-scan');
+
+  // ── EXAM SELECT ──
+  function onExamChange() {
+    const v = document.getElementById('exam-select').value;
+    document.getElementById('method-card').style.display = v ? 'block' : 'none';
+    resetPreview();
+  }
+
+  // ── TABS ──
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (tab==='pdf'?i===0:i===1)));
+    document.getElementById('tab-pdf').classList.toggle('active',  tab==='pdf');
+    document.getElementById('tab-scan').classList.toggle('active', tab==='scan');
+    if (tab !== 'scan') stopCam();
+    resetPreview();
+  }
+
+  // ── FILE SELECTED ──
+  function onFileSelected() {
+    const file  = document.getElementById('pdf-input').files[0];
+    const area  = document.getElementById('upload-area');
+    const label = document.getElementById('file-name');
+    if (file) {
+      area.classList.add('file-selected');
+      label.textContent = '📄 ' + file.name;
+      label.style.display = 'block';
+      document.getElementById('btn-read-pdf').disabled = false;
+    }
+  }
+
+  // ── OPTION A: READ PDF ──
+  async function readPDF() {
+    const examId = document.getElementById('exam-select').value;
+    const file   = document.getElementById('pdf-input').files[0];
+    if (!examId || !file) return;
+
+    const btn = document.getElementById('btn-read-pdf');
+    btn.innerHTML = '<span class="spinner"></span>Reading PDF...';
+    btn.disabled  = true;
+
+    const form = new FormData();
+    form.append('pdf_file', file);
+    form.append('exam_id',  examId);
+
+    try {
+      const res  = await fetch('/key/upload-pdf', { method:'POST', body: form });
+      const data = await res.json();
+
+      if (data.error) { showToast(data.error, 'error'); }
+      else { showPreview(data.answer_key, data.preview); }
+    } catch(e) { showToast('Server error. Try again.', 'error'); }
+
+    btn.innerHTML = '🧠 Read Answer Key from PDF';
+    btn.disabled  = false;
+  }
+
+  // ── CAMERA ──
+  function updateFPS() {
+    fpsCount++;
+    const elapsed = (Date.now()-fpsStart)/1000;
+    if (elapsed >= 1) { fpsBadge.textContent = Math.round(fpsCount/elapsed)+' FPS'; fpsCount=0; fpsStart=Date.now(); }
+  }
+
+  async function startCam() {
+    try {
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:{exact:"environment"}, width:{ideal:1280} } }); }
+      catch { stream = await navigator.mediaDevices.getUserMedia({ video: true }); }
+      video.srcObject = stream;
+      await video.play();
+      isRunning = true;
+      camHolder.classList.add('hidden');
+      btnStart.style.display = 'none';
+      btnStop.style.display  = 'inline-block';
+      camDot.classList.add('active');
+      camStatus.textContent  = 'Scanning... aim at answer sheet';
+      intervalId = setInterval(sendFrame, 150);
+    } catch(e) { alert('Camera access denied. Use HTTPS.'); }
+  }
+
+  function stopCam() {
+    isRunning = false;
+    clearInterval(intervalId);
+    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    btnStart.style.display = 'inline-block';
+    btnStop.style.display  = 'none';
+    camDot.classList.remove('active');
+    camStatus.textContent  = 'Camera off';
+    fpsBadge.textContent   = '0 FPS';
+    btnScan.disabled       = true;
+  }
+
+  async function sendFrame() {
+    if (!isRunning || !video.videoWidth) return;
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+
+    try {
+      const res  = await fetch('/process_frame', { method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'image='+encodeURIComponent(dataURL) });
+      const data = await res.json();
+      processed.src = data.annotated;
+      updateFPS();
+
+      if (data.detected && data.warped) {
+        camStatus.textContent = '✓ Sheet detected! Tap READ THIS SHEET';
+        lastWarped            = data.warped;
+        btnScan.disabled      = false;
+        flash.classList.add('show');
+        setTimeout(() => flash.classList.remove('show'), 200);
+      } else {
+        camStatus.textContent = 'Scanning... aim at answer sheet';
+        btnScan.disabled      = true;
+      }
+    } catch(e) { camStatus.textContent = 'Server error...'; }
+  }
+
+  // ── OPTION B: READ SCAN ──
+  async function readScan() {
+    const examId = document.getElementById('exam-select').value;
+    if (!examId || !lastWarped) return;
+
+    btnScan.innerHTML = '<span class="spinner"></span>Reading sheet...';
+    btnScan.disabled  = true;
+    camStatus.textContent = '🧠 AI reading answers...';
+
+    const form = new FormData();
+    form.append('warped_image', lastWarped);
+    form.append('exam_id',      examId);
+
+    try {
+      const res  = await fetch('/key/scan-sheet', { method:'POST', body: form });
+      const data = await res.json();
+
+      if (data.error) { showToast(data.error, 'error'); }
+      else { stopCam(); showPreview(data.answer_key, data.preview); }
+    } catch(e) { showToast('Server error. Try again.', 'error'); }
+
+    btnScan.innerHTML = '🧠 Read This Sheet';
+    btnScan.disabled  = false;
+  }
+
+  // ── PREVIEW ──
+  function showPreview(keyDict, preview) {
+    currentKey = keyDict;
+    document.getElementById('preview-section').style.display = 'block';
+    document.getElementById('item-count').textContent = preview.length + ' items';
+
+    const grid = document.getElementById('key-grid');
+    grid.innerHTML = '';
+    for (const item of preview) {
+      grid.innerHTML += `
+        <div class="key-item">
+          <div class="q-num">Q${item.q}</div>
+          <input type="text" value="${esc(item.answer)}"
+            onchange="currentKey['${item.q}'] = this.value"
+            maxlength="20" />
+        </div>`;
+    }
+    document.getElementById('preview-section').scrollIntoView({ behavior:'smooth' });
+  }
+
+  function resetPreview() {
+    currentKey = {};
+    document.getElementById('preview-section').style.display = 'none';
+    document.getElementById('key-grid').innerHTML = '';
+  }
+
+  // ── CONFIRM + SAVE ──
+  async function confirmKey() {
+    const examId = document.getElementById('exam-select').value;
+    if (!examId || Object.keys(currentKey).length === 0) {
+      showToast('No answer key to save.', 'error'); return;
+    }
+
+    const form = new FormData();
+    form.append('exam_id',    examId);
+    form.append('answer_key', JSON.stringify(currentKey));
+
+    const res  = await fetch('/key/confirm', { method:'POST', body: form });
+    const data = await res.json();
+
+    if (data.success) {
+      showToast('✓ Answer key saved! ' + data.num_items + ' items.', 'success');
+      setTimeout(() => window.location.href = '/', 1500);
+    } else {
+      showToast(data.error || 'Save failed.', 'error');
+    }
+  }
+
+  // ── HELPERS ──
+  function showToast(msg, type='success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = 'show ' + type;
+    setTimeout(() => { t.className = ''; }, 3500);
+  }
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // Auto-select exam if passed in URL
+  window.onload = () => {
+    const v = document.getElementById('exam-select').value;
+    if (v) document.getElementById('method-card').style.display = 'block';
+  };
+</script>
+</body>
+</html>

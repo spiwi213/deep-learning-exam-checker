@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Exam Scanner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0b0c0f; --card: #14151a; --border: #22242c;
+      --green: #00e676; --blue: #2979ff; --orange: #ff6d00;
+      --red: #f44336; --text: #eeeef3; --muted: #70717e; --r: 14px;
+    }
+    body { background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100dvh; }
+
+    /* HEADER */
+    .header { display: flex; align-items: center; gap: 10px;
+      padding: 14px 18px; background: var(--card); border-bottom: 1px solid var(--border); }
+    .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 10px;
+      display: grid; place-items: center; font-size: 18px; flex-shrink: 0; }
+    .header h1 { font-size: 1rem; font-weight: 700; }
+    .header p  { font-size: 0.72rem; color: var(--muted); }
+
+    /* STATUS */
+    .status-bar { display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 18px; background: var(--card); border-bottom: 1px solid var(--border); font-size: 0.78rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
+    .dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-left { display: flex; align-items: center; gap: 7px; }
+    #fps { font-size: 0.68rem; color: var(--muted); background: var(--border); padding: 2px 8px; border-radius: 8px; }
+
+    /* CAMERA */
+    .camera-wrap { position: relative; background: #000; width: 100%; overflow: hidden; }
+    #processed { width: 100%; display: block; min-height: 260px; object-fit: cover; }
+    #video { display: none; }
+    .placeholder { position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px; background: #0b0c0f; }
+    .placeholder .icon { font-size: 48px; opacity: 0.3; }
+    .placeholder p { font-size: 0.82rem; color: var(--muted); text-align: center; padding: 0 20px; }
+    .placeholder.hidden { display: none; }
+    .flash { position: absolute; inset: 0; background: rgba(0,230,80,0.2);
+      opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+    .flash.show { opacity: 1; }
+
+    /* CONTROLS */
+    .controls { padding: 16px 18px; background: var(--card);
+      border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+    .input-row { display: flex; align-items: center; gap: 8px; }
+    .input-row label { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+    input { flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; color: var(--text); padding: 9px 12px;
+      font-size: 0.88rem; outline: none; width: 100%; }
+    input:focus { border-color: var(--blue); }
+    .btn-row { display: flex; gap: 10px; }
+    .btn { flex: 1; padding: 13px 10px; border: none; border-radius: var(--r);
+      font-size: 0.88rem; font-weight: 700; cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s; }
+    .btn:active  { transform: scale(0.97); opacity: 0.8; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-start { background: var(--green);  color: #000; }
+    .btn-stop  { background: var(--orange); color: #fff; display: none; }
+    .btn-read  { background: var(--blue);   color: #fff; opacity: 0.35; cursor: not-allowed; }
+    .btn-read.ready { opacity: 1; cursor: pointer; }
+
+    /* PREVIEW */
+    .preview { padding: 14px 18px; background: var(--card);
+      border-bottom: 1px solid var(--border); display: none; }
+    .section-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+    #warped-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+
+    /* SPINNER */
+    .spinner { display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo-icon">📷</div>
+  <div>
+    <h1>Exam Scanner</h1>
+    <p>Bubble sheet detector</p>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="status-left">
+    <div class="dot" id="dot"></div>
+    <span id="status">Camera off — tap START</span>
+  </div>
+  <span id="fps">0 FPS</span>
+</div>
+
+<!-- Live camera feed -->
+<div class="camera-wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <img id="processed" src="" alt=""/>
+  <div class="flash" id="flash"></div>
+  <div class="placeholder" id="placeholder">
+    <div class="icon">📄</div>
+    <p>Tap START and aim at the exam paper</p>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="input-row">
+    <label>Student</label>
+    <input type="text" id="student-name" placeholder="Enter student name"/>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-start" id="btn-start" onclick="startCam()">▶ START</button>
+    <button class="btn btn-stop"  id="btn-stop"  onclick="stopCam()">■ STOP</button>
+    <button class="btn btn-read"  id="btn-read"  onclick="readAnswers()" disabled>🔍 READ ANSWERS</button>
+  </div>
+</div>
+
+<!-- Detected sheet preview -->
+<div class="preview" id="preview">
+  <div class="section-label">Detected Sheet</div>
+  <img id="warped-img" src="" alt="Detected sheet"/>
+</div>
+
+<script>
+  let intervalId  = null;
+  let lastWarped  = null;
+  let isRunning   = false;
+  let fpsCount    = 0;
+  let fpsStart    = Date.now();
+  const canvas    = document.createElement('canvas');
+  const ctx       = canvas.getContext('2d');
+
+  const video     = document.getElementById('video');
+  const processed = document.getElementById('processed');
+  const flash     = document.getElementById('flash');
+  const holder    = document.getElementById('placeholder');
+  const dot       = document.getElementById('dot');
+  const statusEl  = document.getElementById('status');
+  const fpsBadge  = document.getElementById('fps');
+  const btnStart  = document.getElementById('btn-start');
+  const btnStop   = document.getElementById('btn-stop');
+  const btnRead   = document.getElementById('btn-read');
+  const previewDiv= document.getElementById('preview');
+  const warpedImg = document.getElementById('warped-img');
+
+  function setStatus(msg) { statusEl.textContent = msg; }
+
+  function updateFPS() {
+    fpsCount++;
+    const elapsed = (Date.now() - fpsStart) / 1000;
+    if (elapsed >= 1) {
+      fpsBadge.textContent = Math.round(fpsCount / elapsed) + ' FPS';
+      fpsCount = 0; fpsStart = Date.now();
+    }
+  }
+
+  async function startCam() {
+    try {
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: "environment" }, width: { ideal: 1280 } }
+        });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+      video.srcObject = stream;
+      await video.play();
+
+      isRunning = true;
+      holder.classList.add('hidden');
+      btnStart.style.display = 'none';
+      btnStop.style.display  = 'inline-block';
+      dot.classList.add('active');
+      setStatus('Scanning... aim at paper');
+
+      intervalId = setInterval(sendFrame, 800);
+    } catch(e) {
+      alert('Camera access denied. Make sure you tapped Proceed on the security warning.');
+    }
+  }
+
+  function stopCam() {
+    isRunning = false;
+    clearInterval(intervalId);
+    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    btnStart.style.display = 'inline-block';
+    btnStop.style.display  = 'none';
+    dot.classList.remove('active');
+    setStatus('Camera off');
+    fpsBadge.textContent = '0 FPS';
+  }
+
+  async function sendFrame() {
+    if (!isRunning || !video.videoWidth) return;
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+
+    try {
+      const res  = await fetch('/scan', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    'image=' + encodeURIComponent(dataURL)
+      });
+      const data = await res.json();
+
+      processed.src = data.annotated;
+      updateFPS();
+
+      if (data.detected && data.warped) {
+        setStatus('✓ Paper detected! Tap READ ANSWERS');
+        lastWarped            = data.warped;
+        warpedImg.src         = data.warped;
+        previewDiv.style.display = 'block';
+        btnRead.disabled      = false;
+        btnRead.classList.add('ready');
+        flash.classList.add('show');
+        setTimeout(() => flash.classList.remove('show'), 200);
+      } else {
+        setStatus('Scanning... aim at paper');
+        btnRead.disabled = true;
+        btnRead.classList.remove('ready');
+      }
+    } catch(e) {
+      setStatus('Server error...');
+    }
+  }
+
+  async function readAnswers() {
+    if (!lastWarped) return;
+
+    const studentName = document.getElementById('student-name').value.trim() || 'Student';
+
+    btnRead.innerHTML = '<span class="spinner"></span>Reading...';
+    btnRead.disabled  = true;
+    setStatus('🔍 Reading bubble answers...');
+    stopCam();
+
+    const form = new FormData();
+    form.append('warped_image', lastWarped);
+    form.append('student_name', studentName);
+
+    try {
+      const res  = await fetch('/detect', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (data.error) {
+        alert('Error: ' + data.error);
+        btnRead.innerHTML = '🔍 READ ANSWERS';
+        btnRead.disabled  = false;
+        return;
+      }
+
+      // Save to sessionStorage and go to results page
+      sessionStorage.setItem('exam_result', JSON.stringify(data));
+      window.location.href = '/results';
+
+    } catch(e) {
+      alert('Failed to read. Check server.');
+      btnRead.innerHTML = '🔍 READ ANSWERS';
+      btnRead.disabled  = false;
+    }
+  }
+</script>
+</body>
+</html>

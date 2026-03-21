@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Detected Answers</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0b0c0f; --card: #14151a; --border: #22242c;
+      --green: #00e676; --green-dim: #00b85622; --blue: #2979ff;
+      --text: #eeeef3; --muted: #70717e; --r: 14px;
+    }
+    body { background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100dvh; }
+
+    /* HEADER */
+    .header { display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; background: var(--card); border-bottom: 1px solid var(--border); }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 36px; height: 36px; background: var(--blue); border-radius: 10px;
+      display: grid; place-items: center; font-size: 18px; }
+    .logo h1 { font-size: 1rem; font-weight: 700; }
+    .back-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--text); font-size: 0.8rem;
+      text-decoration: none; }
+
+    .container { padding: 18px; max-width: 600px; margin: 0 auto;
+      display: flex; flex-direction: column; gap: 16px; }
+
+    /* STUDENT CARD */
+    .student-card { background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 18px; text-align: center; }
+    .student-card h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; }
+    .student-card p  { font-size: 0.8rem; color: var(--muted); }
+    .detected-count { display: inline-block; margin-top: 10px;
+      background: var(--green-dim); color: var(--green);
+      border: 1px solid var(--green); padding: 5px 16px;
+      border-radius: 20px; font-size: 0.82rem; font-weight: 700; }
+
+    /* ANNOTATED IMAGE */
+    .img-card { background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px; }
+    .section-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+    #annotated-img { width: 100%; border-radius: 8px; }
+
+    /* ANSWERS GRID */
+    .answers-card { background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px; }
+    .answers-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .answer-item { background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; padding: 10px 4px; text-align: center; }
+    .answer-item .q-num { font-size: 0.62rem; color: var(--muted); margin-bottom: 4px; display: block; }
+    .answer-item .q-ans { font-size: 1rem; font-weight: 700; color: var(--green); }
+    .answer-item.unknown .q-ans { color: var(--muted); }
+
+    /* SCAN AGAIN */
+    .scan-again { width: 100%; padding: 14px; border: none; border-radius: var(--r);
+      background: var(--green); color: #000; font-size: 0.9rem;
+      font-weight: 700; cursor: pointer; }
+    .scan-again:active { opacity: 0.8; }
+
+    .no-result { text-align: center; padding: 48px 20px; color: var(--muted); }
+    .no-result .icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div><h1>Detected Answers</h1></div>
+  </div>
+  <a href="/" class="back-btn">← Back</a>
+</div>
+
+<div class="container" id="container">
+  <div class="no-result">
+    <div class="icon">📋</div>
+    <p>No results yet — go scan a paper!</p>
+  </div>
+</div>
+
+<script>
+  const raw = sessionStorage.getItem('exam_result');
+  if (raw) {
+    const data = JSON.parse(raw);
+    const con  = document.getElementById('container');
+
+    // Count detected answers
+    const detected = Object.values(data.answers).filter(a => a !== '?').length;
+    const total    = Object.keys(data.answers).length;
+
+    // Build answers grid
+    let gridHTML = '';
+    for (let q = 1; q <= 50; q++) {
+      const ans     = data.answers[String(q)] || '?';
+      const unknown = ans === '?' ? 'unknown' : '';
+      gridHTML += `
+        <div class="answer-item ${unknown}">
+          <span class="q-num">Q${q}</span>
+          <span class="q-ans">${ans}</span>
+        </div>`;
+    }
+
+    con.innerHTML = `
+      <div class="student-card">
+        <h2>${esc(data.student_name)}</h2>
+        <p>Bubble answers detected from scanned sheet</p>
+        <span class="detected-count">✓ ${detected} / ${total} detected</span>
+      </div>
+
+      <div class="img-card">
+        <div class="section-label">Annotated Sheet</div>
+        <img id="annotated-img" src="${data.annotated}" alt="Annotated"/>
+      </div>
+
+      <div class="answers-card">
+        <div class="section-label">Detected Answers</div>
+        <div class="answers-grid">${gridHTML}</div>
+      </div>
+
+      <button class="scan-again" onclick="window.location.href='/'">
+        📷 Scan Next Student
+      </button>
+    `;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>

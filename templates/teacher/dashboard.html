@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Exam Checker — Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0b0c0f; --card: #14151a; --border: #22242c;
+      --green: #00e676; --blue: #2979ff; --orange: #ff6d00;
+      --red: #f44336; --text: #eeeef3; --muted: #70717e; --r: 14px;
+    }
+    body { background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100dvh; }
+
+    /* HEADER */
+    .header { display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; background: var(--card); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 10px;
+      display: grid; place-items: center; font-size: 18px; }
+    .logo h1 { font-size: 1rem; font-weight: 700; }
+    .logo p  { font-size: 0.72rem; color: var(--muted); }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--text); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; transition: background 0.2s; }
+    .nav-btn:hover { background: var(--border); }
+    .nav-btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+    /* CONTENT */
+    .container { padding: 20px 18px; max-width: 800px; margin: 0 auto; }
+    .section-title { font-size: 0.72rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* CREATE EXAM FORM */
+    .create-card { background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 20px; margin-bottom: 28px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.75rem; color: var(--muted); }
+    .form-group input, .form-group select, .form-group textarea {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 9px;
+      color: var(--text); padding: 9px 12px; font-size: 0.88rem; outline: none;
+      transition: border-color 0.2s; width: 100%; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--blue); }
+    .form-group textarea { resize: vertical; min-height: 80px; font-family: monospace; }
+    .form-full { grid-column: 1 / -1; }
+    .hint { font-size: 0.7rem; color: var(--muted); margin-top: 4px; }
+    .btn { padding: 11px 20px; border: none; border-radius: var(--r); font-size: 0.88rem;
+      font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+    .btn:active { opacity: 0.8; }
+    .btn-green  { background: var(--green);  color: #000; }
+    .btn-blue   { background: var(--blue);   color: #fff; }
+    .btn-orange { background: var(--orange); color: #fff; }
+    .btn-sm { padding: 7px 12px; font-size: 0.78rem; border-radius: 8px; }
+
+    /* EXAM CARDS */
+    .exam-list { display: flex; flex-direction: column; gap: 10px; }
+    .exam-card { background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px; display: flex;
+      justify-content: space-between; align-items: center; gap: 12px;
+      animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .exam-info .name { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+    .exam-meta { font-size: 0.75rem; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+    .badge { padding: 3px 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; }
+    .badge-blue   { background: rgba(41,121,255,0.15); color: var(--blue); border: 1px solid var(--blue); }
+    .badge-green  { background: rgba(0,230,118,0.12); color: var(--green); border: 1px solid var(--green); }
+    .exam-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+    .empty { text-align: center; padding: 32px; color: var(--muted); font-size: 0.85rem; }
+    .empty-icon { font-size: 40px; opacity: 0.3; margin-bottom: 10px; }
+
+    /* TOAST */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 20px; font-size: 0.85rem; font-weight: 600;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4); opacity: 0; transition: opacity 0.3s;
+      pointer-events: none; z-index: 100; white-space: nowrap; }
+    #toast.show { opacity: 1; }
+    #toast.success { border-color: var(--green); color: var(--green); }
+    #toast.error   { border-color: var(--red);   color: var(--red); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">📄</div>
+    <div><h1>Exam Checker</h1><p>Teacher Dashboard</p></div>
+  </div>
+  <div class="nav-links">
+    <a href="/student" class="nav-btn">👤 Student Portal</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- CREATE EXAM -->
+  <div class="section-title">Create New Exam</div>
+  <div class="create-card">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Exam Name *</label>
+        <input type="text" id="exam-name" placeholder="e.g. Q1 Science Exam"/>
+      </div>
+      <div class="form-group">
+        <label>Subject</label>
+        <input type="text" id="exam-subject" placeholder="e.g. Science"/>
+      </div>
+      <div class="form-group">
+        <label>Section</label>
+        <input type="text" id="exam-section" placeholder="e.g. Grade 8 - Rizal"/>
+      </div>
+      <div class="form-group">
+        <label>Answer Format</label>
+        <select id="exam-format">
+          <option value="mixed">Mixed (auto-detect)</option>
+          <option value="bubble">Bubble Shading (A B C D)</option>
+          <option value="written">Written Letters (A B C D)</option>
+          <option value="true_false">True or False</option>
+          <option value="matching">Matching Type</option>
+        </select>
+      </div>
+      <div class="form-group form-full">
+        <label>Answer Key *</label>
+        <textarea id="answer-key" placeholder='{"1":"A","2":"B","3":"True","4":"C","5":"D"}'></textarea>
+        <span class="hint">Enter as JSON. Example: {"1":"A","2":"B","3":"C"} — one entry per question.</span>
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="createExam()">＋ Create Exam</button>
+  </div>
+
+  <!-- EXAM LIST -->
+  <div class="section-title">Your Exams</div>
+  <div class="exam-list" id="exam-list">
+    {% if exams %}
+      {% for exam in exams %}
+      <div class="exam-card">
+        <div class="exam-info">
+          <div class="name">{{ exam.name }}</div>
+          <div class="exam-meta">
+            <span>📚 {{ exam.subject or '—' }}</span>
+            <span>👥 {{ exam.section or '—' }}</span>
+            <span>📝 {{ exam.items }} items</span>
+            <span>📅 {{ exam.date }}</span>
+            <span class="badge badge-blue">{{ exam.format }}</span>
+          </div>
+        </div>
+        <div class="exam-actions">
+          <a href="/scan?exam_id={{ exam.id }}" class="btn btn-green btn-sm">📷 Scan</a>
+          <button class="btn btn-blue btn-sm" onclick="viewResults({{ exam.id }}, '{{ exam.name }}')">📊 Results</button>
+          <a href="/export/{{ exam.id }}" class="btn btn-orange btn-sm">⬇ Excel</a>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        <div class="empty-icon">📋</div>
+        <p>No exams yet — create one above!</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- RESULTS MODAL -->
+<div id="results-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7);
+  z-index:50; overflow-y:auto; padding:20px;">
+  <div style="background:var(--card); border:1px solid var(--border); border-radius:var(--r);
+    max-width:700px; margin:0 auto; padding:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 id="modal-title" style="font-size:1rem;"></h2>
+      <button onclick="closeModal()" style="background:none; border:none; color:var(--muted);
+        font-size:1.4rem; cursor:pointer;">✕</button>
+    </div>
+    <div id="modal-body">Loading...</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+async function createExam() {
+  const name    = document.getElementById('exam-name').value.trim();
+  const subject = document.getElementById('exam-subject').value.trim();
+  const section = document.getElementById('exam-section').value.trim();
+  const format  = document.getElementById('exam-format').value;
+  const keyRaw  = document.getElementById('answer-key').value.trim();
+
+  if (!name || !keyRaw) { showToast('Exam name and answer key are required.', 'error'); return; }
+
+  let keyJson;
+  try { keyJson = JSON.parse(keyRaw); } catch { showToast('Invalid JSON in answer key.', 'error'); return; }
+
+  const form = new FormData();
+  form.append('name', name);
+  form.append('subject', subject);
+  form.append('section', section);
+  form.append('exam_format', format);
+  form.append('answer_key', JSON.stringify(keyJson));
+
+  const res  = await fetch('/create_exam', { method: 'POST', body: form });
+  const data = await res.json();
+
+  if (data.success) {
+    showToast('✓ Exam created!', 'success');
+    setTimeout(() => location.reload(), 1200);
+  } else {
+    showToast(data.error || 'Failed to create exam', 'error');
+  }
+}
+
+async function viewResults(examId, examName) {
+  document.getElementById('modal-title').textContent = '📊 ' + examName;
+  document.getElementById('modal-body').innerHTML = 'Loading...';
+  document.getElementById('results-modal').style.display = 'block';
+
+  const res  = await fetch(`/results/${examId}`);
+  const data = await res.json();
+
+  if (!data.results || data.results.length === 0) {
+    document.getElementById('modal-body').innerHTML =
+      '<p style="color:var(--muted); text-align:center; padding:20px;">No results yet.</p>';
+    return;
+  }
+
+  let html = `
+    <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 18px;text-align:center;flex:1;">
+        <div style="font-size:1.4rem;font-weight:700;">${data.total_students}</div>
+        <div style="font-size:0.72rem;color:var(--muted);">Students</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 18px;text-align:center;flex:1;">
+        <div style="font-size:1.4rem;font-weight:700;">${data.average_score}%</div>
+        <div style="font-size:0.72rem;color:var(--muted);">Average</div>
+      </div>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px 18px;text-align:center;flex:1;">
+        <div style="font-size:1.4rem;font-weight:700;">${data.passing_rate}%</div>
+        <div style="font-size:0.72rem;color:var(--muted);">Passing Rate</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+      <tr style="background:var(--bg);">
+        <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border);">Student</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border);">Score</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border);">%</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border);">Status</th>
+      </tr>`;
+
+  for (const r of data.results) {
+    const color = r.passed ? '#00e676' : '#f44336';
+    html += `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;">${r.student_name}</td>
+        <td style="padding:8px;text-align:center;">${r.score}/${r.total}</td>
+        <td style="padding:8px;text-align:center;">${r.percentage}%</td>
+        <td style="padding:8px;text-align:center;color:${color};font-weight:700;">
+          ${r.passed ? 'PASSED' : 'FAILED'}
+        </td>
+      </tr>`;
+  }
+
+  if (data.item_analysis && data.item_analysis.length > 0) {
+    html += `</table><br><div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Item Analysis</div>
+    <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+      <tr style="background:var(--bg);">
+        <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border);">Q#</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border);">Correct</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border);">Wrong</th>
+        <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border);">Difficulty</th>
+      </tr>`;
+
+    for (const item of data.item_analysis) {
+      const col = item.difficulty_label === 'Hard' ? '#f44336' : item.difficulty_label === 'Average' ? '#ff9800' : '#00e676';
+      html += `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;">Q${item.question}</td>
+        <td style="padding:8px;text-align:center;">${item.num_correct}</td>
+        <td style="padding:8px;text-align:center;">${item.num_wrong}</td>
+        <td style="padding:8px;text-align:center;color:${col};font-weight:700;">${item.difficulty_label}</td>
+      </tr>`;
+    }
+  }
+
+  html += '</table>';
+  document.getElementById('modal-body').innerHTML = html;
+}
+
+function closeModal() { document.getElementById('results-modal').style.display = 'none'; }
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = 'show ' + type;
+  setTimeout(() => { t.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>

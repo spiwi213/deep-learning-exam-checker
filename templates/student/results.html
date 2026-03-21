@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>My Exam Results</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --bg:#0b0c0f; --card:#14151a; --border:#22242c; --green:#00e676;
+      --blue:#2979ff; --red:#f44336; --text:#eeeef3; --muted:#70717e; --r:14px; }
+    body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100dvh; }
+    .header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px;
+      background:var(--card); border-bottom:1px solid var(--border); }
+    .logo { display:flex; align-items:center; gap:10px; }
+    .logo-icon { width:36px; height:36px; background:var(--blue); border-radius:10px; display:grid; place-items:center; font-size:18px; }
+    .logo h1 { font-size:1rem; font-weight:700; }
+    .logo p  { font-size:0.72rem; color:var(--muted); }
+    .container { padding:20px 18px; max-width:500px; margin:0 auto; }
+    .lookup-card { background:var(--card); border:1px solid var(--border); border-radius:var(--r); padding:20px; margin-bottom:20px; }
+    .lookup-card h2 { font-size:0.9rem; margin-bottom:14px; }
+    .form-group { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+    .form-group label { font-size:0.75rem; color:var(--muted); }
+    input, select { background:var(--bg); border:1px solid var(--border); border-radius:9px;
+      color:var(--text); padding:10px 12px; font-size:0.9rem; outline:none; width:100%; }
+    input:focus, select:focus { border-color:var(--blue); }
+    .btn { width:100%; padding:13px; border:none; border-radius:var(--r); font-size:0.9rem;
+      font-weight:700; cursor:pointer; background:var(--blue); color:#fff; }
+    .btn:active { opacity:0.8; }
+
+    /* Results */
+    .results-card { background:var(--card); border:1px solid var(--border); border-radius:var(--r); padding:20px; display:none; }
+    .student-header { text-align:center; margin-bottom:20px; }
+    .student-name { font-size:1.2rem; font-weight:700; margin-bottom:4px; }
+    .exam-name { font-size:0.8rem; color:var(--muted); }
+    .score-big { text-align:center; margin-bottom:20px; }
+    .score-number { font-size:3rem; font-weight:700; line-height:1; }
+    .score-label  { font-size:0.78rem; color:var(--muted); margin-top:4px; }
+    .passed-badge { display:inline-block; padding:6px 20px; border-radius:20px;
+      font-weight:700; font-size:0.9rem; margin-top:10px; }
+    .passed-badge.passed { background:rgba(0,230,118,0.15); color:var(--green); border:1px solid var(--green); }
+    .passed-badge.failed { background:rgba(244,67,54,0.12); color:var(--red);   border:1px solid var(--red); }
+    .section-label { font-size:0.7rem; color:var(--muted); text-transform:uppercase;
+      letter-spacing:1px; margin:16px 0 10px; display:flex; align-items:center; gap:6px; }
+    .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+    .per-item-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+    .item-chip { padding:8px 4px; border-radius:8px; text-align:center; font-size:0.72rem; font-weight:700; }
+    .item-chip.correct { background:rgba(0,230,118,0.12); color:var(--green); border:1px solid var(--green); }
+    .item-chip.wrong   { background:rgba(244,67,54,0.12);  color:var(--red);   border:1px solid var(--red); }
+    .item-chip.skipped { background:var(--border); color:var(--muted); }
+    .item-q { display:block; font-size:0.62rem; opacity:0.7; margin-bottom:2px; }
+
+    .error-msg { background:rgba(244,67,54,0.1); border:1px solid var(--red); border-radius:10px;
+      padding:14px; color:var(--red); font-size:0.85rem; text-align:center; display:none; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">👤</div>
+    <div><h1>My Results</h1><p>Student Portal</p></div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="lookup-card">
+    <h2>📋 View Your Score</h2>
+    <div class="form-group">
+      <label>Your Name</label>
+      <input type="text" id="student-name" placeholder="Enter your full name"/>
+    </div>
+    <div class="form-group">
+      <label>Exam</label>
+      <select id="exam-select">
+        <option value="">— Select exam —</option>
+        {% for exam in exams %}
+        <option value="{{ exam.id }}">{{ exam.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn" onclick="lookupScore()">🔍 Find My Score</button>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="results-card" id="results-card">
+    <div class="student-header">
+      <div class="student-name" id="res-name"></div>
+      <div class="exam-name"    id="res-exam"></div>
+      <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;" id="res-date"></div>
+    </div>
+
+    <div class="score-big">
+      <div class="score-number" id="res-score"></div>
+      <div class="score-label">out of <span id="res-total"></span> items</div>
+      <div><span class="passed-badge" id="res-badge"></span></div>
+    </div>
+
+    <div class="section-label">Your Answers</div>
+    <div class="per-item-grid" id="res-per-item"></div>
+  </div>
+</div>
+
+<script>
+async function lookupScore() {
+  const name   = document.getElementById('student-name').value.trim();
+  const examId = document.getElementById('exam-select').value;
+
+  if (!name || !examId) { showError('Please enter your name and select an exam.'); return; }
+
+  hideError(); hideResults();
+
+  const res  = await fetch(`/student/lookup?name=${encodeURIComponent(name)}&exam_id=${examId}`);
+  const data = await res.json();
+
+  if (data.error) { showError(data.error === 'Student not found' ? 'Name not found. Check spelling.' : 'No result found for this exam.'); return; }
+
+  // Fill in results
+  document.getElementById('res-name').textContent  = data.student_name;
+  document.getElementById('res-exam').textContent  = data.exam_name;
+  document.getElementById('res-date').textContent  = 'Scanned: ' + data.date_scanned;
+  document.getElementById('res-score').textContent = data.percentage + '%';
+  document.getElementById('res-total').textContent = data.total;
+
+  const badge = document.getElementById('res-badge');
+  badge.textContent = data.passed ? '✓ PASSED' : '✗ FAILED';
+  badge.className   = 'passed-badge ' + (data.passed ? 'passed' : 'failed');
+
+  // Score color
+  const scoreEl = document.getElementById('res-score');
+  scoreEl.style.color = data.passed ? 'var(--green)' : 'var(--red)';
+
+  // Per item
+  const grid = document.getElementById('res-per-item');
+  grid.innerHTML = '';
+  for (const item of data.per_item) {
+    const icon = item.status==='correct' ? '✓' : item.status==='wrong' ? '✗' : '?';
+    grid.innerHTML += `<div class="item-chip ${item.status}">
+      <span class="item-q">Q${item.question}</span>${icon} ${item.student_answer}
+    </div>`;
+  }
+
+  document.getElementById('results-card').style.display = 'block';
+}
+
+function showError(msg) { const e = document.getElementById('error-msg'); e.textContent = msg; e.style.display = 'block'; }
+function hideError()    { document.getElementById('error-msg').style.display = 'none'; }
+function hideResults()  { document.getElementById('results-card').style.display = 'none'; }
+</script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Exam Scanner — Scan</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0b0c0f; --card: #14151a; --border: #22242c;
+      --green: #00e676; --green-dim: #00b85622; --blue: #2979ff;
+      --orange: #ff6d00; --red: #f44336; --text: #eeeef3; --muted: #70717e; --r: 14px;
+    }
+    body { background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100dvh; }
+
+    .header { display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; background: var(--card); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10; }
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 36px; height: 36px; background: var(--green); border-radius: 10px;
+      display: grid; place-items: center; font-size: 18px; }
+    .logo h1 { font-size: 1rem; font-weight: 700; }
+    .logo p  { font-size: 0.72rem; color: var(--muted); }
+    .back-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+      background: transparent; color: var(--text); font-size: 0.8rem; cursor: pointer;
+      text-decoration: none; }
+
+    .status-bar { display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 18px; background: var(--card); border-bottom: 1px solid var(--border); font-size: 0.78rem; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background 0.3s; }
+    .status-dot.active { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-text { display: flex; align-items: center; gap: 7px; }
+    #fps-badge { font-size: 0.68rem; color: var(--muted); background: var(--border); padding: 2px 8px; border-radius: 10px; }
+
+    .camera-section { position: relative; background: #000; width: 100%; overflow: hidden; }
+    #processed { width: 100%; display: block; min-height: 240px; object-fit: cover; }
+    #video { display: none; }
+    .camera-placeholder { position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px; background: #0b0c0f; }
+    .camera-placeholder .icon { font-size: 48px; opacity: 0.3; }
+    .camera-placeholder p { font-size: 0.82rem; color: var(--muted); }
+    .camera-placeholder.hidden { display: none; }
+    .flash { position: absolute; inset: 0; background: rgba(0,230,80,0.18);
+      pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+    .flash.show { opacity: 1; }
+
+    .controls { padding: 16px 18px; background: var(--card);
+      border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+    .btn-row { display: flex; gap: 10px; }
+    .btn { flex: 1; padding: 13px 10px; border: none; border-radius: var(--r);
+      font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+    .btn:active  { transform: scale(0.97); opacity: 0.8; }
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-start  { background: var(--green);  color: #000; }
+    .btn-stop   { background: var(--orange); color: #fff; display: none; }
+    .btn-read   { background: var(--blue);   color: #fff; opacity: 0.35; cursor: not-allowed; }
+    .btn-read.ready { opacity: 1; cursor: pointer; }
+    .input-row { display: flex; align-items: center; gap: 8px; }
+    .input-row label { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+    input[type=text], select {
+      flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; color: var(--text); padding: 9px 12px; font-size: 0.88rem;
+      outline: none; transition: border-color 0.2s; width: 100%; }
+    input:focus, select:focus { border-color: var(--blue); }
+
+    .section-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+    .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .preview-section { padding: 14px 18px; background: var(--card);
+      border-bottom: 1px solid var(--border); display: none; }
+    #warped-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); display: block; }
+
+    /* AI RESULTS PANEL */
+    .results-panel { padding: 16px 18px; background: var(--card);
+      border-bottom: 1px solid var(--border); display: none; }
+    .score-row { display: flex; gap: 10px; margin-bottom: 14px; }
+    .score-box { flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; text-align: center; }
+    .score-box .val { font-size: 1.5rem; font-weight: 700; }
+    .score-box .lbl { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .score-box.passed .val { color: var(--green); }
+    .score-box.failed .val { color: var(--red); }
+    .per-item-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 14px; }
+    .item-chip { padding: 8px 4px; border-radius: 8px; text-align: center; font-size: 0.72rem; font-weight: 700; }
+    .item-chip.correct { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+    .item-chip.wrong   { background: rgba(244,67,54,0.12); color: var(--red); border: 1px solid var(--red); }
+    .item-chip.skipped { background: var(--border); color: var(--muted); }
+    .item-q  { display: block; font-size: 0.62rem; opacity: 0.7; margin-bottom: 2px; }
+    .confirm-row { display: flex; gap: 10px; }
+    .btn-confirm { flex: 1; padding: 12px; border: none; border-radius: var(--r);
+      font-size: 0.88rem; font-weight: 700; cursor: pointer; }
+    .btn-confirm.save   { background: var(--green);  color: #000; }
+    .btn-confirm.rescan { background: var(--border);  color: var(--text); }
+
+    /* LOG */
+    .log-section { padding: 14px 18px 24px; }
+    #scan-log { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .log-item { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 11px 14px; display: flex; justify-content: space-between; align-items: center;
+      animation: slideIn 0.25s ease; }
+    @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+    .log-name { font-size: 0.85rem; font-weight: 600; }
+    .log-score { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+    .log-chip { font-size: 0.68rem; font-weight: 700; padding: 4px 10px;
+      border-radius: 20px; }
+    .log-chip.passed { background: var(--green-dim); color: var(--green); border: 1px solid var(--green); }
+    .log-chip.failed { background: rgba(244,67,54,0.12); color: var(--red); border: 1px solid var(--red); }
+    .empty { text-align: center; padding: 24px; color: var(--muted); font-size: 0.82rem; }
+
+    /* SPINNER */
+    .spinner { display: inline-block; width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">📷</div>
+    <div><h1>Scan Papers</h1><p>AI Exam Checker</p></div>
+  </div>
+  <a href="/" class="back-btn">← Dashboard</a>
+</div>
+
+<div class="status-bar">
+  <div class="status-text">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">Camera off</span>
+  </div>
+  <span id="fps-badge">0 FPS</span>
+</div>
+
+<div class="camera-section">
+  <video id="video" autoplay playsinline muted></video>
+  <img id="processed" src="" alt=""/>
+  <div class="flash" id="flash"></div>
+  <div class="camera-placeholder" id="placeholder">
+    <div class="icon">📷</div>
+    <p>Select an exam below, then tap START</p>
+  </div>
+</div>
+
+<div class="controls">
+  <div class="input-row">
+    <label>Exam</label>
+    <select id="exam-select">
+      <option value="">— Select exam —</option>
+      {% for exam in exams %}
+      <option value="{{ exam.id }}" data-format="{{ exam.format }}" data-items="{{ exam.items }}"
+        {% if selected_exam and selected_exam.id == exam.id %}selected{% endif %}>
+        {{ exam.name }} ({{ exam.items }} items)
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="input-row">
+    <label>Student</label>
+    <input type="text" id="student-name" placeholder="Enter student name"/>
+  </div>
+  <div class="input-row">
+    <label>Section</label>
+    <input type="text" id="student-section" placeholder="e.g. Grade 8 Rizal"/>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-start" id="btn-start" onclick="startCamera()">▶ START</button>
+    <button class="btn btn-stop"  id="btn-stop"  onclick="stopCamera()">■ STOP</button>
+    <button class="btn btn-read"  id="btn-read"  onclick="readAnswers()" disabled>🧠 READ ANSWERS</button>
+  </div>
+</div>
+
+<div class="preview-section" id="preview-section">
+  <div class="section-label">Detected Sheet (Straightened)</div>
+  <img id="warped-img" src="" alt="Warped sheet"/>
+</div>
+
+<!-- AI RESULTS -->
+<div class="results-panel" id="results-panel">
+  <div class="section-label">AI Detected Answers</div>
+  <div class="score-row" id="score-row"></div>
+  <div class="section-label" style="margin-top:4px;">Per Item Results</div>
+  <div class="per-item-grid" id="per-item-grid"></div>
+  <div class="confirm-row">
+    <button class="btn-confirm rescan" onclick="rescan()">↺ Rescan</button>
+    <button class="btn-confirm save"   onclick="saveResult()">💾 Confirm & Save</button>
+  </div>
+</div>
+
+<div class="log-section">
+  <div class="section-label">Scanned This Session (<span id="scan-count">0</span>)</div>
+  <div id="scan-log">
+    <div class="empty">No sheets scanned yet</div>
+  </div>
+</div>
+
+<script>
+  let intervalId     = null;
+  let lastWarpedSrc  = null;
+  let lastScoreData  = null;
+  let scanCount      = 0;
+  let fpsCounter     = 0;
+  let fpsStart       = Date.now();
+  let isRunning      = false;
+  const canvas       = document.createElement('canvas');
+  const ctx          = canvas.getContext('2d');
+
+  const video        = document.getElementById('video');
+  const processed    = document.getElementById('processed');
+  const flash        = document.getElementById('flash');
+  const placeholder  = document.getElementById('placeholder');
+  const statusDot    = document.getElementById('status-dot');
+  const statusText   = document.getElementById('status-text');
+  const fpsBadge     = document.getElementById('fps-badge');
+  const btnStart     = document.getElementById('btn-start');
+  const btnStop      = document.getElementById('btn-stop');
+  const btnRead      = document.getElementById('btn-read');
+  const previewSec   = document.getElementById('preview-section');
+  const resultsPan   = document.getElementById('results-panel');
+  const scanLog      = document.getElementById('scan-log');
+  const scanCountEl  = document.getElementById('scan-count');
+
+  // FPS
+  function updateFPS() {
+    fpsCounter++;
+    const elapsed = (Date.now() - fpsStart) / 1000;
+    if (elapsed >= 1) { fpsBadge.textContent = Math.round(fpsCounter/elapsed)+' FPS'; fpsCounter=0; fpsStart=Date.now(); }
+  }
+
+  // CAMERA
+  async function startCamera() {
+    const examId = document.getElementById('exam-select').value;
+    if (!examId) { alert('Please select an exam first!'); return; }
+    try {
+      let stream;
+      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact:"environment" }, width:{ideal:1280} } }); }
+      catch { stream = await navigator.mediaDevices.getUserMedia({ video: true }); }
+      video.srcObject = stream;
+      await video.play();
+      isRunning = true;
+      placeholder.classList.add('hidden');
+      btnStart.style.display = 'none';
+      btnStop.style.display  = 'inline-block';
+      statusDot.classList.add('active');
+      setStatus('Scanning... aim at paper');
+      intervalId = setInterval(sendFrame, 150);
+    } catch(err) { alert('Camera access denied. Use HTTPS.'); }
+  }
+
+  function stopCamera() {
+    isRunning = false;
+    clearInterval(intervalId);
+    if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+    btnStart.style.display = 'inline-block';
+    btnStop.style.display  = 'none';
+    statusDot.classList.remove('active');
+    setStatus('Camera off');
+    fpsBadge.textContent = '0 FPS';
+    disableRead();
+  }
+
+  // SEND FRAME
+  async function sendFrame() {
+    if (!isRunning || !video.videoWidth) return;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+    try {
+      const res  = await fetch('/process_frame', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'image='+encodeURIComponent(dataURL) });
+      const data = await res.json();
+      processed.src = data.annotated;
+      updateFPS();
+      if (data.detected && data.warped) {
+        setStatus('✓ Paper detected! Tap READ ANSWERS');
+        lastWarpedSrc = data.warped;
+        document.getElementById('warped-img').src = data.warped;
+        previewSec.style.display = 'block';
+        enableRead();
+        flashGreen();
+      } else {
+        setStatus('Scanning... aim at paper');
+        disableRead();
+      }
+    } catch(err) { setStatus('Server error...'); }
+  }
+
+  // READ ANSWERS — calls Claude Vision AI
+  async function readAnswers() {
+    const examId = document.getElementById('exam-select').value;
+    if (!examId || !lastWarpedSrc) return;
+
+    // Show loading state
+    btnRead.innerHTML = '<span class="spinner"></span>Reading...';
+    btnRead.disabled  = true;
+    setStatus('🧠 AI reading answers...');
+
+    const form = new FormData();
+    form.append('warped_image', lastWarpedSrc);
+    form.append('exam_id', examId);
+
+    try {
+      const res  = await fetch('/read_answers', { method:'POST', body: form });
+      const data = await res.json();
+
+      if (data.error) { alert('AI Error: ' + data.error); btnRead.innerHTML = '🧠 READ ANSWERS'; btnRead.disabled = false; return; }
+
+      lastScoreData = data;
+      displayResults(data);
+      stopCamera();  // stop scanning once we have answers
+      setStatus('✓ Answers read! Review and save.');
+
+    } catch(err) {
+      alert('Failed to read answers. Check server.');
+    }
+    btnRead.innerHTML = '🧠 READ ANSWERS';
+  }
+
+  // DISPLAY AI RESULTS
+  function displayResults(data) {
+    resultsPan.style.display = 'block';
+
+    const passColor = data.passed ? 'var(--green)' : 'var(--red)';
+    document.getElementById('score-row').innerHTML = `
+      <div class="score-box"><div class="val">${data.score}/${data.total}</div><div class="lbl">Score</div></div>
+      <div class="score-box"><div class="val" style="color:${passColor}">${data.percentage}%</div><div class="lbl">Percentage</div></div>
+      <div class="score-box ${data.passed?'passed':'failed'}"><div class="val">${data.passed?'PASSED':'FAILED'}</div><div class="lbl">Status</div></div>
+      <div class="score-box"><div class="val" style="font-size:0.9rem">${data.confidence||'—'}</div><div class="lbl">AI Confidence</div></div>
+    `;
+
+    const grid = document.getElementById('per-item-grid');
+    grid.innerHTML = '';
+    for (const item of data.per_item) {
+      const cls  = item.status;
+      const icon = cls==='correct' ? '✓' : cls==='wrong' ? '✗' : '?';
+      grid.innerHTML += `
+        <div class="item-chip ${cls}">
+          <span class="item-q">Q${item.question}</span>
+          ${icon} ${item.student_answer}
+        </div>`;
+    }
+  }
+
+  function rescan() {
+    resultsPan.style.display = 'none';
+    previewSec.style.display = 'none';
+    lastScoreData = null;
+    lastWarpedSrc = null;
+    disableRead();
+    startCamera();
+  }
+
+  async function saveResult() {
+    if (!lastScoreData) return;
+    const examId   = document.getElementById('exam-select').value;
+    const name     = document.getElementById('student-name').value.trim() || 'Student '+(scanCount+1);
+    const section  = document.getElementById('student-section').value.trim();
+
+    const form = new FormData();
+    form.append('exam_id',         examId);
+    form.append('student_name',    name);
+    form.append('student_section', section);
+    form.append('student_answers', JSON.stringify(lastScoreData.answers));
+    form.append('warped_image',    lastWarpedSrc || '');
+
+    const res  = await fetch('/save_result', { method:'POST', body: form });
+    const data = await res.json();
+
+    if (data.success) {
+      addToLog(name, data.score, data.total, data.passed);
+      document.getElementById('student-name').value = '';
+      resultsPan.style.display = 'none';
+      previewSec.style.display = 'none';
+      lastScoreData = null; lastWarpedSrc = null;
+      disableRead();
+      setStatus('✓ Saved! Scan next student.');
+    } else {
+      alert('Save failed: ' + (data.error || 'Unknown error'));
+    }
+  }
+
+  // HELPERS
+  function setStatus(msg) { statusText.textContent = msg; }
+  function enableRead()  { btnRead.disabled = false; btnRead.classList.add('ready'); }
+  function disableRead() { btnRead.disabled = true;  btnRead.classList.remove('ready'); }
+  function flashGreen()  { flash.classList.add('show'); setTimeout(()=>flash.classList.remove('show'), 200); }
+
+  function addToLog(name, score, total, passed) {
+    const empty = scanLog.querySelector('.empty');
+    if (empty) empty.remove();
+    scanCount++; scanCountEl.textContent = scanCount;
+    const time = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    item.innerHTML = `
+      <div>
+        <div class="log-name">${esc(name)}</div>
+        <div class="log-score">${score}/${total} — ${time}</div>
+      </div>
+      <span class="log-chip ${passed?'passed':'failed'}">${passed?'PASSED':'FAILED'}</span>`;
+    scanLog.prepend(item);
+  }
+
+  function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
