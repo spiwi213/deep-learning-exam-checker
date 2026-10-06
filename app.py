@@ -7,10 +7,11 @@ Routes:
   GET  /          → scan page
   GET  /results   → results page
   POST /scan      → paper detection (camera frame)
-  POST /detect    → read bubble answers from warped paper
+  POST /detect    → read bubble answers, grade, save to Google Sheets
 """
 
 from fastapi import FastAPI, Form, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -19,8 +20,14 @@ import numpy as np
 import base64
 import os
 
-from detector      import detect_paper
-from bubble_reader import read_bubble_answers
+from detector       import detect_paper
+from bubble_reader  import read_bubble_answers
+from sheets_service import append_result, normalize_answers, grade
+
+# ─────────────────────────────────────────────
+# ANSWER KEY  (palitan ng totoong key mo — 50 items)
+# ─────────────────────────────────────────────
+from answer_key import ANSWER_KEY   # edit answer_key.py para palitan
 
 # ─────────────────────────────────────────────
 # SETUP
@@ -95,18 +102,19 @@ async def scan(image: str = Form(...)):
 
 
 # ─────────────────────────────────────────────
-# API — BUBBLE READING
+# API — BUBBLE READING + GRADING + GOOGLE SHEETS
 # ─────────────────────────────────────────────
 
 @app.post("/detect")
 async def detect(
-    warped_image: str = Form(...),
-    student_name: str = Form(...)
+    warped_image:  str = Form(...),
+    student_name:  str = Form(...),
+    save_to_sheet: bool = Form(True)   # i-send ang "false" para di mag-save (test mode)
 ):
     """
-    Reads bubble answers from the warped (flat) paper image.
-    Returns detected answers per question + annotated image.
-    No answer key needed — just shows what was shaded.
+    1. Reads bubble answers from the warped (flat) paper image
+    2. Grades them against ANSWER_KEY
+    3. Appends one row to Google Sheets
     """
     image = base64_to_opencv(warped_image)
     if image is None:
@@ -119,11 +127,33 @@ async def detect(
 
     annotated_b64 = opencv_to_base64(result["annotated"])
 
+    # ── Grade ──
+    cleaned = normalize_answers(result["answers"], len(ANSWER_KEY))
+    summary = grade(cleaned, ANSWER_KEY)
+
+    # ── Save to Google Sheets (hindi mag-fa-fail ang scan kapag may sheet error) ──
+    saved       = False
+    sheet_error = None
+    if save_to_sheet:
+        try:
+            # run_in_threadpool: blocking ang gspread, para di ma-freeze ang server
+            await run_in_threadpool(append_result, student_name, result["answers"], ANSWER_KEY)
+            saved = True
+        except Exception as e:
+            sheet_error = str(e)
+            print(f"[Sheets] ERROR: {e}")
+
     return JSONResponse({
         "student_name": student_name,
         "answers":      result["answers"],
         "annotated":    annotated_b64,
-        "detected":     result["detected"]
+        "detected":     result["detected"],
+        "score":        summary["score"],
+        "total":        summary["total"],
+        "percent":      summary["percent"],
+        "status":       summary["status"],
+        "saved":        saved,
+        "sheet_error":  sheet_error
     })
 
 
@@ -136,7 +166,7 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host         = "0.0.0.0",
-        port         = 5000,
+        port         = 5001,
         ssl_keyfile  = "server.key",
         ssl_certfile = "server.crt"
     )

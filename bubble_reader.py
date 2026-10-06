@@ -2,12 +2,11 @@
 bubble_reader.py
 ────────────────────────────────────────────────
 Reads bubble answers from a warped exam paper image.
-This is the calibrate.py logic packaged for use in app.py.
+Used by app.py for live scanning.
 
 Usage:
     from bubble_reader import read_bubble_answers
     result = read_bubble_answers(warped_image_opencv)
-    # result = {"answers": {"1":"A", "2":"B"...}, "error": None}
 """
 
 import cv2
@@ -16,12 +15,10 @@ from ultralytics import YOLO
 import os
 
 # ─────────────────────────────────────────────
-# SETTINGS (tuned from calibration)
+# SETTINGS
 # ─────────────────────────────────────────────
 
-MODEL_PATH      = "models/best.pt"
-TOTAL_QUESTIONS = 50
-
+MODEL_PATH     = "models/best.pt"
 MIN_DIST       = 20
 PARAM1         = 50
 PARAM2         = 28
@@ -29,14 +26,11 @@ MIN_RADIUS     = 8
 MAX_RADIUS     = 20
 ROW_TOLERANCE  = 18
 
-# Column layout
-COL1 = list(range(1,  18))   # Q1  to Q17
-COL2 = list(range(18, 35))   # Q18 to Q34
-COL3 = list(range(35, 51))   # Q35 to Q50
-
+COL1    = list(range(1,  18))   # Q1  to Q17
+COL2    = list(range(18, 35))   # Q18 to Q34
+COL3    = list(range(35, 51))   # Q35 to Q50
 LETTERS = ["A", "B", "C", "D"]
 
-# Load YOLO model once
 _model = None
 
 def get_model():
@@ -50,13 +44,14 @@ def get_model():
 
 
 # ─────────────────────────────────────────────
-# HELPERS
+# READ ONE QUESTION (4 bubbles)
 # ─────────────────────────────────────────────
 
 def read_group(group, gray, q_num):
     """
     Read one question's 4 bubbles.
-    Returns the letter of the darkest bubble.
+    Picks the darkest bubble as the answer.
+    Returns ? if no bubble is clearly filled.
     """
     mean_vals = []
     for (x, y, r) in group:
@@ -68,16 +63,25 @@ def read_group(group, gray, q_num):
             continue
         mean_vals.append(float(np.mean(pixels)))
 
-    answer_idx = mean_vals.index(min(mean_vals))
-    min_val    = mean_vals[answer_idx]
+    answer_idx  = mean_vals.index(min(mean_vals))
+    min_val     = mean_vals[answer_idx]
+    sorted_vals = sorted(mean_vals)
+    difference  = sorted_vals[1] - sorted_vals[0]
 
-    if min_val < 200:
+    # Only count as answered if:
+    # 1. Darkest bubble is clearly dark (< 180)
+    # 2. It is clearly darker than the next bubble (difference > 15)
+    if min_val < 180 and difference > 15:
         return LETTERS[answer_idx]
     return "?"
 
 
+# ─────────────────────────────────────────────
+# DRAW CIRCLES ON IMAGE
+# ─────────────────────────────────────────────
+
 def draw_group(group, gray, output, q_num, answer):
-    """Draw colored circles on the output image."""
+    """Draw GREEN on answer bubble, RED on empty bubbles."""
     mean_vals = []
     for (x, y, r) in group:
         mask   = np.zeros(gray.shape, dtype=np.uint8)
@@ -106,18 +110,12 @@ def draw_group(group, gray, output, q_num, answer):
 
 def read_bubble_answers(image):
     """
-    Main function — takes an OpenCV image of the exam paper.
-    Returns dict:
-    {
-        "answers":    {"1": "A", "2": "B", ...},
-        "annotated":  OpenCV image with circles drawn,
-        "detected":   int — number of answers found,
-        "error":      str or None
-    }
+    Main function called by app.py.
+    Input:  OpenCV BGR image of the exam paper
+    Output: dict with answers, annotated image, detected count, error
     """
     try:
         model  = get_model()
-        h, w   = image.shape[:2]
         output = image.copy()
 
         # ── YOLO detect bubble zone ──
@@ -126,13 +124,13 @@ def read_bubble_answers(image):
 
         if len(detections) == 0:
             return {
-                "answers":  {},
+                "answers":   {},
                 "annotated": output,
-                "detected": 0,
-                "error":    "No bubble zone detected. Hold paper flat and steady."
+                "detected":  0,
+                "error":     "No bubble zone detected. Hold paper flat and steady."
             }
 
-        # Pick largest zone
+        # Pick the largest detected zone
         largest_area = -1
         best_box     = None
         for b in detections:
@@ -145,7 +143,7 @@ def read_bubble_answers(image):
         x1, y1, x2, y2 = map(int, best_box.xyxy[0])
         conf            = float(best_box.conf[0])
 
-        # Crop + resize zone
+        # Crop + resize zone to standard width
         zone          = image[y1:y2, x1:x2].copy()
         target_width  = 700
         scale         = target_width / zone.shape[1]
@@ -153,7 +151,7 @@ def read_bubble_answers(image):
         zone          = cv2.resize(zone, (target_width, target_height))
         zone_output   = zone.copy()
 
-        # ── Circle detection ──
+        # ── Detect circles ──
         gray    = cv2.cvtColor(zone, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
@@ -165,15 +163,15 @@ def read_bubble_answers(image):
 
         if circles is None:
             return {
-                "answers":  {},
+                "answers":   {},
                 "annotated": output,
-                "detected": 0,
-                "error":    "No circles detected. Try better lighting."
+                "detected":  0,
+                "error":     "No circles detected. Try better lighting."
             }
 
         circles = np.round(circles[0, :]).astype("int")
 
-        # ── Group into rows ──
+        # ── Group circles into rows ──
         circles     = sorted(circles, key=lambda c: c[1])
         rows        = []
         current_row = [circles[0]]
@@ -186,12 +184,14 @@ def read_bubble_answers(image):
                 current_row = [circle]
         rows.append(sorted(current_row, key=lambda c: c[0]))
 
+        # Keep only valid rows
         rows = [r for r in rows if len(r) in [8, 12, 13]]
 
-        # ── Read answers ──
+        # ── Read answers row by row ──
         answers = {}
 
         for row_idx, row in enumerate(rows):
+            # Fix 13-circle rows — remove stray circle on the left
             if len(row) == 13:
                 row = row[1:]
 
@@ -217,16 +217,16 @@ def read_bubble_answers(image):
         detected = len([a for a in answers.values() if a != "?"])
 
         return {
-            "answers":  answers,
+            "answers":   answers,
             "annotated": zone_output,
-            "detected": detected,
-            "error":    None
+            "detected":  detected,
+            "error":     None
         }
 
     except Exception as e:
         return {
-            "answers":  {},
+            "answers":   {},
             "annotated": image,
-            "detected": 0,
-            "error":    str(e)
+            "detected":  0,
+            "error":     str(e)
         }

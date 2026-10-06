@@ -1,7 +1,7 @@
 """
 calibrate.py
 ────────────────────────────────────────────────
-Standalone bubble detection tester.
+Standalone bubble detection tester + grading + Google Sheets.
 Works best with: light pencil / ballpen shading
                  portrait orientation
                  dark background
@@ -14,17 +14,32 @@ Exam layout:
 Colors in output.jpg:
   GREEN  = detected answer
   RED    = empty bubble
+
+Usage:
+  python calibrate.py                                  # test_photo.jpg, dry run
+  python calibrate.py test_photo.jpg "Juan Dela Cruz"  # with student name
+  python calibrate.py test_photo.jpg "Juan Dela Cruz" --save   # save to Google Sheets
 """
 
+import sys
+import os
 import cv2
 import numpy as np
 from ultralytics import YOLO
+
+from answer_key     import ANSWER_KEY
+from sheets_service import grade, normalize_answers, append_result
 
 # ─────────────────────────────────────────────
 # SETTINGS
 # ─────────────────────────────────────────────
 
-IMAGE_PATH      = "test_photo.jpg"
+_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+SAVE_TO_SHEET = "--save" in sys.argv
+
+IMAGE_PATH      = _args[0] if len(_args) > 0 else "test_photo.jpg"
+STUDENT_NAME    = _args[1] if len(_args) > 1 else \
+                  os.path.splitext(os.path.basename(IMAGE_PATH))[0].replace("_", " ")
 MODEL_PATH      = "models/best.pt"
 OUTPUT_PATH     = "output.jpg"
 TOTAL_QUESTIONS = 50
@@ -48,11 +63,15 @@ print("=" * 50)
 print("BUBBLE DETECTION CALIBRATOR")
 print("=" * 50)
 
+if len(ANSWER_KEY) != TOTAL_QUESTIONS:
+    print(f"⚠️  ANSWER_KEY has {len(ANSWER_KEY)} items but TOTAL_QUESTIONS is {TOTAL_QUESTIONS}")
+
 image = cv2.imread(IMAGE_PATH)
 if image is None:
     print(f"❌ Could not load {IMAGE_PATH}")
     exit()
 print(f"✅ Image loaded: {image.shape[1]}x{image.shape[0]} px")
+print(f"   Student: {STUDENT_NAME}")
 
 model = YOLO(MODEL_PATH)
 print(f"✅ Model loaded: {MODEL_PATH}")
@@ -170,7 +189,9 @@ def read_group(group, gray, output, q_num, letters):
             mean_vals.append(255.0)
             continue
         mean_vals.append(float(np.mean(pixels)))
-
+    
+    print(f"Q{q_num} → A={mean_vals[0]:.1f} B={mean_vals[1]:.1f} C={mean_vals[2]:.1f} D={mean_vals[3]:.1f} picked={['A','B','C','D'][mean_vals.index(min(mean_vals))]}")
+    
     # Darkest bubble = lowest mean = the answer
     answer_idx = mean_vals.index(min(mean_vals))
     min_val    = mean_vals[answer_idx]
@@ -190,7 +211,7 @@ def read_group(group, gray, output, q_num, letters):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.32, (255, 255, 0), 1)
 
     # Return ? only if all bubbles are completely white (empty paper)
-    if min_val < 200:
+    if min_val < 180:
         return letters[answer_idx]
     return "?"
 
@@ -254,7 +275,7 @@ print(f"\n✅ Saved: {OUTPUT_PATH}")
 print(f"✅ Saved: output_full.jpg")
 
 # ─────────────────────────────────────────────
-# STEP 9 — PRINT ANSWERS
+# STEP 9 — PRINT ANSWERS (with answer key check)
 # ─────────────────────────────────────────────
 
 print("\n" + "=" * 50)
@@ -263,17 +284,46 @@ print("=" * 50)
 
 unknown = []
 for q in range(1, TOTAL_QUESTIONS + 1):
-    a      = answers.get(str(q), "?")
-    status = "✓" if a != "?" else "?"
-    print(f"  Q{q:>2}: {a}  {status}")
+    a   = answers.get(str(q), "?")
+    key = ANSWER_KEY[q - 1] if q <= len(ANSWER_KEY) else "-"
     if a == "?":
+        mark = "?"
         unknown.append(str(q))
+    elif a == key:
+        mark = "✓"
+    else:
+        mark = f"✗ (key: {key})"
+    print(f"  Q{q:>2}: {a}  {mark}")
 
 print(f"\nTotal:    {TOTAL_QUESTIONS}")
 print(f"Detected: {TOTAL_QUESTIONS - len(unknown)}")
 print(f"Unknown:  {len(unknown)}")
 if unknown:
     print(f"Unknown Q: {', '.join(unknown)}")
+
+# ─────────────────────────────────────────────
+# STEP 10 — GRADE + SAVE TO GOOGLE SHEETS
+# ─────────────────────────────────────────────
+
+cleaned = normalize_answers(answers, len(ANSWER_KEY))
+summary = grade(cleaned, ANSWER_KEY)
+
+print("\n" + "=" * 50)
+print("SCORE")
+print("=" * 50)
+print(f"  Student: {STUDENT_NAME}")
+print(f"  Score:   {summary['score']}/{summary['total']}")
+print(f"  Percent: {summary['percent']}%")
+print(f"  Status:  {summary['status']}")
+
+if SAVE_TO_SHEET:
+    try:
+        append_result(STUDENT_NAME, answers, ANSWER_KEY)
+        print("  ✅ Saved to Google Sheets")
+    except Exception as e:
+        print(f"  ❌ Google Sheets error: {e}")
+else:
+    print("  (dry run — add --save to write to Google Sheets)")
 
 print("\n" + "=" * 50)
 print("CALIBRATION TIPS")
